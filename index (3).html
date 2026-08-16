@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Décodeur de fichiers</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --border:#2a2f3a;
+    --accent:#5ec3a6;
+    --accent2:#e8b34c;
+    --text:#e6e8ec;
+    --muted:#8b93a3;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    padding:32px 16px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.6rem;margin-bottom:4px;}
+  p.sub{color:var(--muted);margin-top:0;margin-bottom:24px;}
+
+  .drop{
+    border:2px dashed var(--border);
+    border-radius:12px;
+    padding:40px 20px;
+    text-align:center;
+    background:var(--panel);
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop.drag{
+    border-color:var(--accent);
+    background:#1b2129;
+  }
+  .drop input{display:none;}
+  .drop .icon{font-size:2.2rem;margin-bottom:8px;}
+  .drop .hint{color:var(--muted);font-size:.85rem;margin-top:6px;}
+
+  #fileInfo{
+    margin-top:16px;
+    padding:12px 16px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    font-size:.9rem;
+    display:none;
+  }
+  #fileInfo b{color:var(--accent);}
+
+  .tabs{display:flex;gap:6px;margin-top:20px;flex-wrap:wrap;display:none;}
+  .tabs button{
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:.85rem;
+  }
+  .tabs button.active{border-color:var(--accent);color:var(--accent);}
+
+  .toolbar{
+    display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;
+    display:none;
+  }
+  .toolbar input[type=text]{
+    flex:1;min-width:160px;
+    background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:8px 10px;border-radius:8px;font-size:.85rem;
+  }
+  .toolbar button{
+    background:var(--accent);color:#0f1115;border:none;
+    padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;
+  }
+  .toolbar button.secondary{
+    background:transparent;color:var(--text);border:1px solid var(--border);
+  }
+
+  #output{
+    margin-top:14px;
+    background:#0b0d11;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    max-height:60vh;
+    overflow:auto;
+    font-family:'Consolas','Courier New',monospace;
+    font-size:.8rem;
+    white-space:pre-wrap;
+    word-break:break-word;
+    display:none;
+  }
+  .str-line{padding:2px 0;border-bottom:1px solid #1a1e26;}
+  .str-line.code{color:var(--accent2);}
+  .str-line:hover{background:#12151b;}
+  .badge{
+    display:inline-block;font-size:.65rem;padding:1px 6px;border-radius:5px;
+    background:#232a35;color:var(--muted);margin-right:8px;
+  }
+  .badge.code{background:#3a2f16;color:var(--accent2);}
+
+  #status{color:var(--muted);font-size:.85rem;margin-top:10px;display:none;}
+  footer{margin-top:40px;color:var(--muted);font-size:.75rem;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🗂️ Décodeur de fichiers</h1>
+  <p class="sub">Envoie un fichier pour le décoder. Support spécial des fichiers Roblox binaires
+    (<code>.rbxl</code>, <code>.rbxm</code>) : décompression LZ4 automatique et extraction du code / texte lisible.
+    Tout se passe dans ton navigateur, aucun fichier n'est envoyé sur un serveur.</p>
+
+  <div class="drop" id="drop">
+    <input type="file" id="fileInput">
+    <div class="icon">📤</div>
+    <div><b>Clique ici</b> ou dépose un fichier</div>
+    <div class="hint">Fonctionne avec n'importe quel type de fichier</div>
+  </div>
+
+  <div id="fileInfo"></div>
+  <div id="status"></div>
+
+  <div class="tabs" id="tabs">
+    <button data-tab="strings" class="active">Chaînes / Code extrait</button>
+    <button data-tab="hex">Hex + ASCII</button>
+  </div>
+
+  <div class="toolbar" id="toolbar">
+    <input type="text" id="filter" placeholder="Filtrer (ex: function, local, http...)">
+    <button id="downloadBtn">💾 Télécharger le texte extrait</button>
+    <button class="secondary" id="clearBtn">Effacer</button>
+  </div>
+
+  <div id="output"></div>
+
+  <footer>100% côté client — hébergeable tel quel sur GitHub Pages.</footer>
+</div>
+
+<script>
+/* ---------------------------------------------------------
+   Décompression LZ4 "block" (sans frame header), telle
+   qu'utilisée dans le format binaire Roblox (.rbxl/.rbxm)
+--------------------------------------------------------- */
+function lz4Decompress(src, uncompressedSize) {
+  const dst = new Uint8Array(uncompressedSize);
+  let si = 0, di = 0;
+  while (si < src.length) {
+    const token = src[si++];
+    let litLen = token >> 4;
+    if (litLen === 15) {
+      let b;
+      do { b = src[si++]; litLen += b; } while (b === 255);
+    }
+    for (let i = 0; i < litLen; i++) dst[di++] = src[si++];
+    if (si >= src.length || di >= uncompressedSize) break;
+
+    const offset = src[si] | (src[si + 1] << 8);
+    si += 2;
+    let matchLen = token & 0x0f;
+    if (matchLen === 15) {
+      let b;
+      do { b = src[si++]; matchLen += b; } while (b === 255);
+    }
+    matchLen += 4;
+    let matchPos = di - offset;
+    for (let i = 0; i < matchLen; i++) {
+      dst[di] = dst[matchPos];
+      di++; matchPos++;
+    }
+  }
+  return dst;
+}
+
+/* ---------------------------------------------------------
+   Parsing du format binaire Roblox (chunks: SSTR/INST/PROP/...)
+--------------------------------------------------------- */
+function parseRobloxBinary(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let off = 32; // 8 octets magic "<roblox!" + 24 octets d'en-tête
+  const chunks = [];
+  while (off + 16 <= bytes.length) {
+    const type = String.fromCharCode(bytes[off], bytes[off+1], bytes[off+2], bytes[off+3]).replace(/\0/g,'');
+    const compLen = dv.getUint32(off+4, true);
+    const uncompLen = dv.getUint32(off+8, true);
+    off += 16;
+    if (off + compLen > bytes.length) break;
+    const raw = bytes.slice(off, off + compLen);
+    off += compLen;
+
+    let data;
+    if (compLen === uncompLen) {
+      data = raw; // chunk non compressé
+    } else {
+      try { data = lz4Decompress(raw, uncompLen); }
+      catch(e) { data = raw; }
+    }
+    chunks.push({ type, data });
+    if (type === 'END') break;
+  }
+  return chunks;
+}
+
+/* ---------------------------------------------------------
+   Extraction de chaînes lisibles (ASCII/UTF-8 imprimables)
+--------------------------------------------------------- */
+function extractStrings(bytes, minLen = 4) {
+  const results = [];
+  let cur = [];
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    const printable = (b >= 32 && b <= 126) || b === 9;
+    if (printable) {
+      cur.push(b);
+    } else {
+      if (cur.length >= minLen) results.push(String.fromCharCode(...cur));
+      cur = [];
+    }
+  }
+  if (cur.length >= minLen) results.push(String.fromCharCode(...cur));
+  return results;
+}
+
+function looksLikeCode(s) {
+  return /\b(function|local|end|then|require|game\.|script\.|:Connect|wait\(|print\()\b/.test(s);
+}
+
+/* ---------------------------------------------------------
+   UI
+--------------------------------------------------------- */
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const statusEl = document.getElementById('status');
+const output = document.getElementById('output');
+const tabs = document.getElementById('tabs');
+const toolbar = document.getElementById('toolbar');
+const filterInput = document.getElementById('filter');
+
+let extractedStrings = [];
+let hexBytes = null;
+let currentTab = 'strings';
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+
+tabs.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    render();
+  });
+});
+
+filterInput.addEventListener('input', render);
+document.getElementById('clearBtn').addEventListener('click', () => filterInput.value = '' , render);
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const blob = new Blob([extractedStrings.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'extrait.txt';
+  a.click();
+});
+
+async function handleFile(file) {
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Lecture du fichier...';
+  output.style.display = 'none';
+
+  const buf = new Uint8Array(await file.arrayBuffer());
+  hexBytes = buf;
+
+  const magic = String.fromCharCode(...buf.slice(0,8));
+  let isRoblox = magic === '<roblox!';
+
+  fileInfo.style.display = 'block';
+  fileInfo.innerHTML =
+    `<b>${file.name}</b> — ${(file.size/1024).toFixed(1)} Ko<br>` +
+    (isRoblox
+      ? `Format détecté : <b>fichier binaire Roblox</b> (chunks compressés LZ4)`
+      : `Format détecté : fichier générique (extraction de chaînes brutes)`);
+
+  statusEl.textContent = 'Décodage en cours...';
+
+  let allStrings = [];
+  if (isRoblox) {
+    try {
+      const chunks = parseRobloxBinary(buf);
+      for (const c of chunks) {
+        const strs = extractStrings(c.data, 4);
+        for (const s of strs) allStrings.push(s);
+      }
+    } catch (e) {
+      statusEl.textContent = 'Erreur de parsing binaire Roblox, extraction brute utilisée.';
+      allStrings = extractStrings(buf, 4);
+    }
+  } else {
+    allStrings = extractStrings(buf, 4);
+  }
+
+  // dédoublonnage en conservant l'ordre
+  extractedStrings = [...new Set(allStrings)];
+
+  statusEl.textContent = `Terminé : ${extractedStrings.length} chaînes extraites.`;
+  tabs.style.display = 'flex';
+  toolbar.style.display = 'flex';
+  output.style.display = 'block';
+  render();
+}
+
+function render() {
+  const filter = filterInput.value.trim().toLowerCase();
+  if (currentTab === 'strings') {
+    const items = extractedStrings.filter(s => !filter || s.toLowerCase().includes(filter));
+    output.innerHTML = items.slice(0, 5000).map(s => {
+      const code = looksLikeCode(s);
+      return `<div class="str-line ${code?'code':''}"><span class="badge ${code?'code':''}">${code?'code':'texte'}</span>${escapeHtml(s)}</div>`;
+    }).join('') || '<i style="color:var(--muted)">Aucun résultat</i>';
+  } else {
+    output.textContent = toHexDump(hexBytes, filter);
+  }
+}
+
+function toHexDump(bytes, filter) {
+  if (!bytes) return '';
+  const max = Math.min(bytes.length, 20000); // limite d'affichage pour rester fluide
+  let out = '';
+  for (let i = 0; i < max; i += 16) {
+    const slice = bytes.slice(i, i+16);
+    const hex = Array.from(slice).map(b => b.toString(16).padStart(2,'0')).join(' ');
+    const ascii = Array.from(slice).map(b => (b>=32&&b<=126)?String.fromCharCode(b):'.').join('');
+    const line = i.toString(16).padStart(8,'0') + '  ' + hex.padEnd(47,' ') + '  ' + ascii;
+    if (!filter || line.toLowerCase().includes(filter)) out += line + '\n';
+  }
+  if (bytes.length > max) out += `\n... (${bytes.length - max} octets supplémentaires non affichés)`;
+  return out;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
