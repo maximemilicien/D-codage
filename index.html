@@ -3,165 +3,123 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Décodeur de fichiers</title>
+<title>Décodeur de fichiers Roblox</title>
 <style>
   :root{
-    --bg:#0f1115;
-    --panel:#171a21;
-    --border:#2a2f3a;
-    --accent:#5ec3a6;
-    --accent2:#e8b34c;
-    --text:#e6e8ec;
-    --muted:#8b93a3;
+    --bg:#0f1115; --panel:#171a21; --panel2:#1b1f27; --border:#2a2f3a;
+    --accent:#5ec3a6; --accent2:#e8b34c; --text:#e6e8ec; --muted:#8b93a3;
     font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    min-height:100vh;
-    padding:32px 16px;
-  }
-  .wrap{max-width:920px;margin:0 auto;}
-  h1{font-size:1.6rem;margin-bottom:4px;}
-  p.sub{color:var(--muted);margin-top:0;margin-bottom:24px;}
+  body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;}
+  .topbar{padding:18px 20px 8px;}
+  h1{font-size:1.4rem;margin:0 0 2px;}
+  p.sub{color:var(--muted);margin:0 0 16px;font-size:.85rem;}
 
   .drop{
-    border:2px dashed var(--border);
-    border-radius:12px;
-    padding:40px 20px;
-    text-align:center;
-    background:var(--panel);
-    cursor:pointer;
-    transition:border-color .15s, background .15s;
+    margin:0 20px 16px;border:2px dashed var(--border);border-radius:12px;
+    padding:26px 20px;text-align:center;background:var(--panel);cursor:pointer;
   }
-  .drop.drag{
-    border-color:var(--accent);
-    background:#1b2129;
-  }
+  .drop.drag{border-color:var(--accent);background:#1b2129;}
   .drop input{display:none;}
-  .drop .icon{font-size:2.2rem;margin-bottom:8px;}
-  .drop .hint{color:var(--muted);font-size:.85rem;margin-top:6px;}
+  .drop .hint{color:var(--muted);font-size:.8rem;margin-top:4px;}
 
-  #fileInfo{
-    margin-top:16px;
-    padding:12px 16px;
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:10px;
-    font-size:.9rem;
-    display:none;
-  }
-  #fileInfo b{color:var(--accent);}
+  #status{padding:0 20px;color:var(--muted);font-size:.85rem;display:none;margin-bottom:10px;}
 
-  .tabs{display:flex;gap:6px;margin-top:20px;flex-wrap:wrap;display:none;}
-  .tabs button{
-    background:var(--panel);
-    border:1px solid var(--border);
-    color:var(--text);
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-    font-size:.85rem;
-  }
-  .tabs button.active{border-color:var(--accent);color:var(--accent);}
+  .app{display:none;grid-template-columns:300px 1fr;gap:0;height:calc(100vh - 150px);border-top:1px solid var(--border);}
+  #fileInfoBar{display:none;padding:8px 20px;background:var(--panel2);font-size:.8rem;color:var(--muted);border-top:1px solid var(--border);}
+  #fileInfoBar b{color:var(--accent);}
 
-  .toolbar{
-    display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;
-    display:none;
+  .sidebar{
+    background:var(--panel);border-right:1px solid var(--border);
+    overflow-y:auto;padding:10px 6px;
   }
-  .toolbar input[type=text]{
-    flex:1;min-width:160px;
-    background:var(--panel);border:1px solid var(--border);color:var(--text);
-    padding:8px 10px;border-radius:8px;font-size:.85rem;
+  .sidebar input{
+    width:100%;padding:7px 10px;margin-bottom:8px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.8rem;
   }
-  .toolbar button{
-    background:var(--accent);color:#0f1115;border:none;
-    padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;
+  .tree-node{user-select:none;}
+  .tree-row{
+    display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:5px;
+    cursor:pointer;font-size:.82rem;white-space:nowrap;
   }
-  .toolbar button.secondary{
-    background:transparent;color:var(--text);border:1px solid var(--border);
-  }
+  .tree-row:hover{background:var(--panel2);}
+  .tree-row.selected{background:#22303a;color:var(--accent);}
+  .tree-row .arrow{width:12px;display:inline-block;color:var(--muted);font-size:.7rem;}
+  .tree-row .icon{width:16px;text-align:center;}
+  .tree-children{margin-left:16px;display:none;border-left:1px dotted var(--border);}
+  .tree-children.open{display:block;}
+  .tree-row.hidden{display:none;}
 
-  #output{
-    margin-top:14px;
-    background:#0b0d11;
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:16px;
-    max-height:60vh;
-    overflow:auto;
-    font-family:'Consolas','Courier New',monospace;
-    font-size:.8rem;
-    white-space:pre-wrap;
-    word-break:break-word;
-    display:none;
+  .main{overflow:auto;padding:0;display:flex;flex-direction:column;}
+  .breadcrumb{
+    padding:10px 18px;background:var(--panel2);border-bottom:1px solid var(--border);
+    font-size:.85rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center;
   }
-  .str-line{padding:2px 0;border-bottom:1px solid #1a1e26;}
-  .str-line.code{color:var(--accent2);}
-  .str-line:hover{background:#12151b;}
-  .badge{
-    display:inline-block;font-size:.65rem;padding:1px 6px;border-radius:5px;
-    background:#232a35;color:var(--muted);margin-right:8px;
+  .breadcrumb b{color:var(--text);}
+  .breadcrumb button{
+    background:var(--accent);border:none;color:#0f1115;padding:6px 12px;border-radius:7px;
+    cursor:pointer;font-size:.78rem;font-weight:600;
   }
-  .badge.code{background:#3a2f16;color:var(--accent2);}
+  .codebox{
+    flex:1;overflow:auto;background:#0b0d11;font-family:Consolas,'Courier New',monospace;font-size:.82rem;
+  }
+  .codebox table{border-collapse:collapse;width:100%;}
+  .codebox td.ln{color:#4a5062;text-align:right;padding:0 12px;user-select:none;vertical-align:top;width:1%;}
+  .codebox td.code{padding:0 12px;white-space:pre-wrap;word-break:break-word;}
+  .codebox tr:hover{background:#12151b;}
+  .empty-panel{padding:40px;color:var(--muted);text-align:center;}
 
-  #status{color:var(--muted);font-size:.85rem;margin-top:10px;display:none;}
-  footer{margin-top:40px;color:var(--muted);font-size:.75rem;text-align:center;}
+  .kw{color:#c586c0;} .str{color:#ce9178;} .cm{color:#6a9955;font-style:italic;} .num{color:#b5cea8;} .fn{color:#dcdcaa;}
+
+  footer{padding:14px 20px;color:var(--muted);font-size:.72rem;text-align:center;}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>🗂️ Décodeur de fichiers</h1>
-  <p class="sub">Envoie un fichier pour le décoder. Support spécial des fichiers Roblox binaires
-    (<code>.rbxl</code>, <code>.rbxm</code>) : décompression LZ4 automatique et extraction du code / texte lisible.
-    Tout se passe dans ton navigateur, aucun fichier n'est envoyé sur un serveur.</p>
-
-  <div class="drop" id="drop">
-    <input type="file" id="fileInput">
-    <div class="icon">📤</div>
-    <div><b>Clique ici</b> ou dépose un fichier</div>
-    <div class="hint">Fonctionne avec n'importe quel type de fichier</div>
-  </div>
-
-  <div id="fileInfo"></div>
-  <div id="status"></div>
-
-  <div class="tabs" id="tabs">
-    <button data-tab="strings" class="active">Chaînes / Code extrait</button>
-    <button data-tab="hex">Hex + ASCII</button>
-  </div>
-
-  <div class="toolbar" id="toolbar">
-    <input type="text" id="filter" placeholder="Filtrer (ex: function, local, http...)">
-    <button id="downloadBtn">💾 Télécharger le texte extrait</button>
-    <button class="secondary" id="clearBtn">Effacer</button>
-  </div>
-
-  <div id="output"></div>
-
-  <footer>100% côté client — hébergeable tel quel sur GitHub Pages.</footer>
+<div class="topbar">
+  <h1>🧩 Décodeur de fichiers Roblox</h1>
+  <p class="sub">Dépose un fichier <code>.rbxl</code> / <code>.rbxm</code> pour reconstruire l'arborescence (comme dans Studio) et lire le code des scripts dans leur mise en forme d'origine. Tout se passe dans le navigateur.</p>
 </div>
+
+<div class="drop" id="drop">
+  <input type="file" id="fileInput">
+  <div><b>Clique ici</b> ou dépose un fichier .rbxl / .rbxm</div>
+  <div class="hint">Aucun envoi sur un serveur — traitement 100% local</div>
+</div>
+
+<div id="status"></div>
+<div id="fileInfoBar"></div>
+
+<div class="app" id="app">
+  <div class="sidebar">
+    <input type="text" id="treeFilter" placeholder="Filtrer l'arborescence...">
+    <div id="treeRoot"></div>
+  </div>
+  <div class="main">
+    <div class="breadcrumb">
+      <span id="breadcrumbText">Sélectionne un élément dans l'arborescence</span>
+      <button id="downloadCodeBtn" style="display:none;">💾 Télécharger</button>
+    </div>
+    <div class="codebox" id="codebox">
+      <div class="empty-panel">Clique sur un Script / LocalScript / ModuleScript à gauche pour voir son code.</div>
+    </div>
+  </div>
+</div>
+
+<footer>100% côté client — hébergeable tel quel sur GitHub Pages.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js"></script>
 <script>
-/* ---------------------------------------------------------
-   Décompression des chunks du format binaire Roblox.
-   Roblox compresse ses chunks avec Zstandard (zstd) — la
-   librairie fzstd (chargée ci-dessus) fait le travail.
---------------------------------------------------------- */
-function robloxChunkDecompress(src, uncompressedSize) {
-  const out = fzstd.decompress(src);
-  return out;
+/* ===================== Décompression des chunks ===================== */
+function chunkDecompress(raw, uncompLen) {
+  if (raw.length === uncompLen) return raw; // non compressé
+  try { return fzstd.decompress(raw); }
+  catch (e) { return raw; }
 }
 
-/* ---------------------------------------------------------
-   Parsing du format binaire Roblox (chunks: SSTR/INST/PROP/...)
---------------------------------------------------------- */
-function parseRobloxBinary(bytes) {
+function splitChunks(bytes) {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let off = 32; // 8 octets magic "<roblox!" + 24 octets d'en-tête
+  let off = 32;
   const chunks = [];
   while (off + 16 <= bytes.length) {
     const type = String.fromCharCode(bytes[off], bytes[off+1], bytes[off+2], bytes[off+3]).replace(/\0/g,'');
@@ -171,169 +129,301 @@ function parseRobloxBinary(bytes) {
     if (off + compLen > bytes.length) break;
     const raw = bytes.slice(off, off + compLen);
     off += compLen;
-
-    let data;
-    if (compLen === uncompLen) {
-      data = raw; // chunk non compressé
-    } else {
-      try { data = robloxChunkDecompress(raw, uncompLen); }
-      catch(e) { data = raw; }
-    }
+    const data = chunkDecompress(raw, uncompLen);
     chunks.push({ type, data });
     if (type === 'END') break;
   }
   return chunks;
 }
 
-/* ---------------------------------------------------------
-   Extraction de chaînes lisibles (ASCII/UTF-8 imprimables)
---------------------------------------------------------- */
-function extractStrings(bytes, minLen = 4) {
-  const results = [];
-  let cur = [];
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i];
-    const printable = (b >= 32 && b <= 126) || b === 9;
-    if (printable) {
-      cur.push(b);
-    } else {
-      if (cur.length >= minLen) results.push(String.fromCharCode(...cur));
-      cur = [];
+/* ===================== Lecture bas niveau ===================== */
+function readI32(buf, off) {
+  const v = (buf[off]) | (buf[off+1]<<8) | (buf[off+2]<<16) | (buf[off+3]<<24);
+  return [v, off+4];
+}
+function readString(buf, off) {
+  let len; [len, off] = readI32(buf, off);
+  const bytes = buf.subarray(off, off+len);
+  const s = new TextDecoder('utf-8').decode(bytes);
+  return [s, off+len];
+}
+// tableau d'i32 stocké "interleaved" (transposé par octet) + zigzag + delta cumulatif
+function readInterleavedI32(buf, off, count) {
+  const raw = new Uint32Array(count);
+  for (let j = 0; j < 4; j++) {
+    const base = off + j*count;
+    for (let i = 0; i < count; i++) {
+      raw[i] |= buf[base+i] << (24 - j*8);
     }
   }
-  if (cur.length >= minLen) results.push(String.fromCharCode(...cur));
-  return results;
+  const out = new Int32Array(count);
+  let accum = 0;
+  for (let i = 0; i < count; i++) {
+    const v = raw[i] >>> 0;
+    const zz = (v >>> 1) ^ (-(v & 1));
+    accum = (accum + zz) | 0;
+    out[i] = accum;
+  }
+  return [out, off + count*4];
 }
 
-function looksLikeCode(s) {
-  return /\b(function|local|end|then|require|game\.|script\.|:Connect|wait\(|print\()\b/.test(s);
+/* ===================== Parsing structure Roblox ===================== */
+function parseRobloxFile(bytes) {
+  const chunks = splitChunks(bytes);
+  const instances = {};      // referent -> {class,name,source,parent,children:[]}
+  const classReferents = {}; // classId -> [referents]
+  const classNames = {};
+
+  for (const {type, data} of chunks) {
+    if (type !== 'INST') continue;
+    let off = 0, classId, cname, objFormat, numInst, refs;
+    [classId, off] = readI32(data, off);
+    [cname, off] = readString(data, off);
+    objFormat = data[off]; off += 1;
+    [numInst, off] = readI32(data, off);
+    [refs, off] = readInterleavedI32(data, off, numInst);
+    classNames[classId] = cname;
+    classReferents[classId] = refs;
+    for (const r of refs) {
+      instances[r] = { class: cname, name: null, source: null, parent: null, children: [] };
+    }
+  }
+
+  const sharedStrings = [];
+  for (const {type, data} of chunks) {
+    if (type !== 'SSTR') continue;
+    let off = 0, version, num;
+    [version, off] = readI32(data, off);
+    [num, off] = readI32(data, off);
+    for (let i = 0; i < num; i++) {
+      off += 16; // hash md5
+      let len; [len, off] = readI32(data, off);
+      const s = new TextDecoder('utf-8').decode(data.subarray(off, off+len));
+      off += len;
+      sharedStrings.push(s);
+    }
+  }
+
+  for (const {type, data} of chunks) {
+    if (type !== 'PROP') continue;
+    let off = 0, classId, pname;
+    [classId, off] = readI32(data, off);
+    [pname, off] = readString(data, off);
+    if (pname !== 'Name' && pname !== 'Source') continue;
+    const dtype = data[off]; off += 1;
+    const refs = classReferents[classId] || [];
+    const count = refs.length;
+    const key = pname === 'Name' ? 'name' : 'source';
+    if (dtype === 0x01) { // String
+      for (let i = 0; i < count; i++) {
+        let s; [s, off] = readString(data, off);
+        if (instances[refs[i]]) instances[refs[i]][key] = s;
+      }
+    } else if (dtype === 0x1c) { // SharedString
+      let idxs; [idxs, off] = readInterleavedI32(data, off, count);
+      for (let i = 0; i < count; i++) {
+        const s = sharedStrings[idxs[i]];
+        if (instances[refs[i]] && s !== undefined) instances[refs[i]][key] = s;
+      }
+    }
+  }
+
+  for (const {type, data} of chunks) {
+    if (type !== 'PRNT') continue;
+    let off = 1; // version byte
+    let numLinks, children, parents;
+    [numLinks, off] = readI32(data, off);
+    [children, off] = readInterleavedI32(data, off, numLinks);
+    [parents, off] = readInterleavedI32(data, off, numLinks);
+    for (let i = 0; i < numLinks; i++) {
+      const c = children[i], p = parents[i];
+      if (instances[c]) {
+        instances[c].parent = p;
+        if (instances[p]) instances[p].children.push(c);
+      }
+    }
+  }
+
+  const realRoots = Object.keys(instances).map(Number).filter(r => !instances.hasOwnProperty(instances[r].parent));
+
+  return { instances, roots: realRoots };
 }
 
-/* ---------------------------------------------------------
-   UI
---------------------------------------------------------- */
+/* ===================== Icônes ===================== */
+const SCRIPT_CLASSES = new Set(['Script','LocalScript','ModuleScript']);
+const ICONS = {
+  Workspace:'🌍', Players:'👥', Lighting:'💡', ReplicatedStorage:'📦', ReplicatedFirst:'🥇',
+  ServerScriptService:'🗄️', ServerStorage:'🗄️', StarterGui:'🖥️', StarterPack:'🎒', StarterPlayer:'🧍',
+  Teams:'🚩', SoundService:'🔊', Script:'📜', LocalScript:'📜', ModuleScript:'📘', Folder:'📁',
+  Player:'🙋'
+};
+function iconFor(cls){ return ICONS[cls] || '⚙️'; }
+
+/* ===================== Rendu de l'arborescence ===================== */
+let PARSED = null;
+let selectedRef = null;
+
+function nodeLabel(inst) {
+  return inst.name || inst.class;
+}
+
+function buildTreeDOM(container, refs, parsed) {
+  const ul = document.createElement('div');
+  const sorted = refs.slice().sort((a,b) => nodeLabel(parsed.instances[a]).localeCompare(nodeLabel(parsed.instances[b])));
+  for (const ref of sorted) {
+    const inst = parsed.instances[ref];
+    const wrap = document.createElement('div');
+    wrap.className = 'tree-node';
+
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.dataset.ref = ref;
+    row.dataset.label = (nodeLabel(inst) + ' ' + inst.class).toLowerCase();
+
+    const hasChildren = inst.children.length > 0;
+    row.innerHTML = `<span class="arrow">${hasChildren ? '▶' : ''}</span><span class="icon">${iconFor(inst.class)}</span><span class="label">${escapeHtml(nodeLabel(inst))}</span>`;
+
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectNode(ref);
+      if (hasChildren) {
+        const childDiv = wrap.querySelector('.tree-children');
+        childDiv.classList.toggle('open');
+        row.querySelector('.arrow').textContent = childDiv.classList.contains('open') ? '▼' : '▶';
+      }
+    });
+
+    wrap.appendChild(row);
+
+    if (hasChildren) {
+      const childDiv = document.createElement('div');
+      childDiv.className = 'tree-children';
+      buildTreeDOM(childDiv, inst.children, parsed);
+      wrap.appendChild(childDiv);
+    }
+    ul.appendChild(wrap);
+  }
+  container.appendChild(ul);
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function pathTo(ref, parsed) {
+  const parts = [];
+  let cur = ref;
+  while (parsed.instances[cur]) {
+    parts.unshift(nodeLabel(parsed.instances[cur]));
+    cur = parsed.instances[cur].parent;
+  }
+  return parts;
+}
+
+function highlightLua(src) {
+  let s = escapeHtml(src);
+  s = s.replace(/(--\[\[[\s\S]*?\]\])|(--[^\n]*)/g, m => `<span class="cm">${m}</span>`);
+  s = s.replace(/("([^"\\]|\\.)*")|('([^'\\]|\\.)*')/g, m => `<span class="str">${m}</span>`);
+  s = s.replace(/\b(local|function|end|if|then|else|elseif|return|true|false|nil|and|or|not|for|while|do|in|break|repeat|until)\b/g, '<span class="kw">$1</span>');
+  s = s.replace(/\b(\d+\.?\d*)\b/g, '<span class="num">$1</span>');
+  return s;
+}
+
+function selectNode(ref) {
+  selectedRef = ref;
+  document.querySelectorAll('.tree-row.selected').forEach(el => el.classList.remove('selected'));
+  const row = document.querySelector(`.tree-row[data-ref="${ref}"]`);
+  if (row) row.classList.add('selected');
+
+  const inst = PARSED.instances[ref];
+  const path = pathTo(ref, PARSED);
+  const breadcrumbText = document.getElementById('breadcrumbText');
+  const dlBtn = document.getElementById('downloadCodeBtn');
+  const codebox = document.getElementById('codebox');
+
+  if (SCRIPT_CLASSES.has(inst.class) && inst.source) {
+    breadcrumbText.innerHTML = `${path.slice(0,-1).join(' > ')}${path.length>1?' > ':''}<b>${escapeHtml(inst.name || inst.class)}</b> <span style="color:var(--muted)">(${inst.class})</span>`;
+    dlBtn.style.display = 'inline-block';
+    dlBtn.onclick = () => {
+      const blob = new Blob([inst.source], {type:'text/plain'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (inst.name || inst.class) + '.lua';
+      a.click();
+    };
+    const lines = inst.source.split('\n');
+    let html = '<table>';
+    lines.forEach((line, i) => {
+      html += `<tr><td class="ln">${i+1}</td><td class="code">${highlightLua(line) || ' '}</td></tr>`;
+    });
+    html += '</table>';
+    codebox.innerHTML = html;
+  } else {
+    breadcrumbText.innerHTML = `${path.join(' > ')} <span style="color:var(--muted)">(${inst.class})</span>`;
+    dlBtn.style.display = 'none';
+    codebox.innerHTML = `<div class="empty-panel">${inst.children.length} enfant(s) — ${SCRIPT_CLASSES.has(inst.class) ? 'ce script ne contient pas de code lisible.' : "sélectionne un Script, LocalScript ou ModuleScript pour voir du code."}</div>`;
+  }
+}
+
+/* ===================== Chargement fichier ===================== */
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('fileInput');
-const fileInfo = document.getElementById('fileInfo');
 const statusEl = document.getElementById('status');
-const output = document.getElementById('output');
-const tabs = document.getElementById('tabs');
-const toolbar = document.getElementById('toolbar');
-const filterInput = document.getElementById('filter');
-
-let extractedStrings = [];
-let hexBytes = null;
-let currentTab = 'strings';
-let currentFileName = 'extrait';
+const app = document.getElementById('app');
+const fileInfoBar = document.getElementById('fileInfoBar');
+const treeFilter = document.getElementById('treeFilter');
 
 drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
 drop.addEventListener('drop', e => {
-  e.preventDefault();
-  drop.classList.remove('drag');
+  e.preventDefault(); drop.classList.remove('drag');
   if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
-fileInput.addEventListener('change', () => {
-  if (fileInput.files.length) handleFile(fileInput.files[0]);
-});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
 
-tabs.querySelectorAll('button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    tabs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentTab = btn.dataset.tab;
-    render();
+treeFilter.addEventListener('input', () => {
+  const q = treeFilter.value.trim().toLowerCase();
+  document.querySelectorAll('.tree-row').forEach(row => {
+    const match = !q || row.dataset.label.includes(q);
+    row.classList.toggle('hidden', !match);
+    if (match && q) {
+      // ouvrir les parents
+      let p = row.closest('.tree-children');
+      while (p) { p.classList.add('open'); const arrow = p.previousElementSibling ? p.previousElementSibling.querySelector('.arrow') : null; if(arrow) arrow.textContent='▼'; p = p.parentElement.closest('.tree-children'); }
+    }
   });
-});
-
-filterInput.addEventListener('input', render);
-document.getElementById('clearBtn').addEventListener('click', () => filterInput.value = '' , render);
-document.getElementById('downloadBtn').addEventListener('click', () => {
-  const blob = new Blob([extractedStrings.join('\n')], {type:'text/plain'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = currentFileName + '_extrait.txt';
-  a.click();
 });
 
 async function handleFile(file) {
   statusEl.style.display = 'block';
-  statusEl.textContent = 'Lecture du fichier...';
-  output.style.display = 'none';
+  statusEl.textContent = 'Lecture et décompression du fichier...';
+  app.style.display = 'none';
 
   const buf = new Uint8Array(await file.arrayBuffer());
-  hexBytes = buf;
-  currentFileName = file.name.replace(/\.[^/.]+$/, '') || 'extrait';
-
   const magic = String.fromCharCode(...buf.slice(0,8));
-  let isRoblox = magic === '<roblox!';
 
-  fileInfo.style.display = 'block';
-  fileInfo.innerHTML =
-    `<b>${file.name}</b> — ${(file.size/1024).toFixed(1)} Ko<br>` +
-    (isRoblox
-      ? `Format détecté : <b>fichier binaire Roblox</b> (chunks compressés LZ4)`
-      : `Format détecté : fichier générique (extraction de chaînes brutes)`);
-
-  statusEl.textContent = 'Décodage en cours...';
-
-  let allStrings = [];
-  if (isRoblox) {
-    try {
-      const chunks = parseRobloxBinary(buf);
-      for (const c of chunks) {
-        const strs = extractStrings(c.data, 4);
-        for (const s of strs) allStrings.push(s);
-      }
-    } catch (e) {
-      statusEl.textContent = 'Erreur de parsing binaire Roblox, extraction brute utilisée.';
-      allStrings = extractStrings(buf, 4);
-    }
-  } else {
-    allStrings = extractStrings(buf, 4);
+  if (magic !== '<roblox!') {
+    statusEl.textContent = "Ce fichier n'est pas un fichier binaire Roblox (.rbxl/.rbxm) reconnu.";
+    return;
   }
 
-  // dédoublonnage en conservant l'ordre
-  extractedStrings = [...new Set(allStrings)];
-
-  statusEl.textContent = `Terminé : ${extractedStrings.length} chaînes extraites.`;
-  tabs.style.display = 'flex';
-  toolbar.style.display = 'flex';
-  output.style.display = 'block';
-  render();
-}
-
-function render() {
-  const filter = filterInput.value.trim().toLowerCase();
-  if (currentTab === 'strings') {
-    const items = extractedStrings.filter(s => !filter || s.toLowerCase().includes(filter));
-    output.innerHTML = items.slice(0, 5000).map(s => {
-      const code = looksLikeCode(s);
-      return `<div class="str-line ${code?'code':''}"><span class="badge ${code?'code':''}">${code?'code':'texte'}</span>${escapeHtml(s)}</div>`;
-    }).join('') || '<i style="color:var(--muted)">Aucun résultat</i>';
-  } else {
-    output.textContent = toHexDump(hexBytes, filter);
+  try {
+    PARSED = parseRobloxFile(buf);
+  } catch (e) {
+    statusEl.textContent = 'Erreur pendant le décodage : ' + e.message;
+    return;
   }
-}
 
-function toHexDump(bytes, filter) {
-  if (!bytes) return '';
-  const max = Math.min(bytes.length, 20000); // limite d'affichage pour rester fluide
-  let out = '';
-  for (let i = 0; i < max; i += 16) {
-    const slice = bytes.slice(i, i+16);
-    const hex = Array.from(slice).map(b => b.toString(16).padStart(2,'0')).join(' ');
-    const ascii = Array.from(slice).map(b => (b>=32&&b<=126)?String.fromCharCode(b):'.').join('');
-    const line = i.toString(16).padStart(8,'0') + '  ' + hex.padEnd(47,' ') + '  ' + ascii;
-    if (!filter || line.toLowerCase().includes(filter)) out += line + '\n';
-  }
-  if (bytes.length > max) out += `\n... (${bytes.length - max} octets supplémentaires non affichés)`;
-  return out;
-}
+  const nbInst = Object.keys(PARSED.instances).length;
+  const nbScripts = Object.values(PARSED.instances).filter(i => SCRIPT_CLASSES.has(i.class) && i.source).length;
+  statusEl.style.display = 'none';
+  fileInfoBar.style.display = 'block';
+  fileInfoBar.innerHTML = `<b>${file.name}</b> — ${nbInst} instances reconstruites, ${nbScripts} scripts trouvés.`;
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const treeRoot = document.getElementById('treeRoot');
+  treeRoot.innerHTML = '';
+  buildTreeDOM(treeRoot, PARSED.roots, PARSED);
+
+  app.style.display = 'grid';
 }
 </script>
 </body>
