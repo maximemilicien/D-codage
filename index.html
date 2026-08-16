@@ -144,39 +144,16 @@
   <footer>100% côté client — hébergeable tel quel sur GitHub Pages.</footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js"></script>
 <script>
 /* ---------------------------------------------------------
-   Décompression LZ4 "block" (sans frame header), telle
-   qu'utilisée dans le format binaire Roblox (.rbxl/.rbxm)
+   Décompression des chunks du format binaire Roblox.
+   Roblox compresse ses chunks avec Zstandard (zstd) — la
+   librairie fzstd (chargée ci-dessus) fait le travail.
 --------------------------------------------------------- */
-function lz4Decompress(src, uncompressedSize) {
-  const dst = new Uint8Array(uncompressedSize);
-  let si = 0, di = 0;
-  while (si < src.length) {
-    const token = src[si++];
-    let litLen = token >> 4;
-    if (litLen === 15) {
-      let b;
-      do { b = src[si++]; litLen += b; } while (b === 255);
-    }
-    for (let i = 0; i < litLen; i++) dst[di++] = src[si++];
-    if (si >= src.length || di >= uncompressedSize) break;
-
-    const offset = src[si] | (src[si + 1] << 8);
-    si += 2;
-    let matchLen = token & 0x0f;
-    if (matchLen === 15) {
-      let b;
-      do { b = src[si++]; matchLen += b; } while (b === 255);
-    }
-    matchLen += 4;
-    let matchPos = di - offset;
-    for (let i = 0; i < matchLen; i++) {
-      dst[di] = dst[matchPos];
-      di++; matchPos++;
-    }
-  }
-  return dst;
+function robloxChunkDecompress(src, uncompressedSize) {
+  const out = fzstd.decompress(src);
+  return out;
 }
 
 /* ---------------------------------------------------------
@@ -199,7 +176,7 @@ function parseRobloxBinary(bytes) {
     if (compLen === uncompLen) {
       data = raw; // chunk non compressé
     } else {
-      try { data = lz4Decompress(raw, uncompLen); }
+      try { data = robloxChunkDecompress(raw, uncompLen); }
       catch(e) { data = raw; }
     }
     chunks.push({ type, data });
@@ -247,6 +224,7 @@ const filterInput = document.getElementById('filter');
 let extractedStrings = [];
 let hexBytes = null;
 let currentTab = 'strings';
+let currentFileName = 'extrait';
 
 drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
@@ -275,7 +253,7 @@ document.getElementById('downloadBtn').addEventListener('click', () => {
   const blob = new Blob([extractedStrings.join('\n')], {type:'text/plain'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'extrait.txt';
+  a.download = currentFileName + '_extrait.txt';
   a.click();
 });
 
@@ -286,6 +264,7 @@ async function handleFile(file) {
 
   const buf = new Uint8Array(await file.arrayBuffer());
   hexBytes = buf;
+  currentFileName = file.name.replace(/\.[^/.]+$/, '') || 'extrait';
 
   const magic = String.fromCharCode(...buf.slice(0,8));
   let isRoblox = magic === '<roblox!';
